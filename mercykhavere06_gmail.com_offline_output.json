@@ -1,0 +1,185 @@
+{
+  "milestones": [
+    {
+      "milestone_id": "m1",
+      "prompt": "Design the memory layout for a lock-free SPSC ring buffer in POSIX shared memory using shm_open and mmap. Include struct layout, indices, and how producer/consumer coordinate safely.",
+      "milestone_reason_optional": "Validates that the model understands low-level shared memory layout and SPSC invariants before coding.",
+      "continuation_criteria": "Model defines a correct ring buffer layout with head/tail indices, avoids locks, and explains memory ordering strategy.",
+      "planned_interactions_list": [
+        {
+          "trigger": "Model proposes using Mutex or channels",
+          "reaction": "No locks. This must be lock-free using atomics."
+        },
+        {
+          "trigger": "Model ignores memory ordering semantics",
+          "reaction": "Be explicit about Acquire/Release ordering for producer and consumer."
+        },
+        {
+          "trigger": "Model does not separate head/tail to avoid false sharing",
+          "reaction": "Think about cache-line alignment. Where do head and tail live?"
+        }
+      ]
+    },
+    {
+      "milestone_id": "m2",
+      "prompt": "Implement the shared memory setup in Rust using libc (shm_open, ftruncate, mmap). No abstraction crates.",
+      "milestone_reason_optional": "Ensures correct low-level IPC setup before building the data structure.",
+      "continuation_criteria": "Model correctly uses shm_open, sets size with ftruncate, and maps memory with mmap.",
+      "planned_interactions_list": [
+        {
+          "trigger": "Model uses external crates for shared memory",
+          "reaction": "Do it via libc only. No wrappers."
+        },
+        {
+          "trigger": "Model forgets to handle mmap failure",
+          "reaction": "Check return values. mmap can fail."
+        }
+      ]
+    },
+    {
+      "milestone_id": "m3",
+      "prompt": "Implement the lock-free SPSC ring buffer operations (enqueue/dequeue) using atomics.",
+      "milestone_reason_optional": "Core correctness of lock-free algorithm.",
+      "continuation_criteria": "Push/pop implemented using atomic head/tail with correct wraparound and memory ordering.",
+      "planned_interactions_list": [
+        {
+          "trigger": "Model uses SeqCst everywhere",
+          "reaction": "Too strong. Use minimal ordering needed."
+        },
+        {
+          "trigger": "Model introduces race condition",
+          "reaction": "Check when head/tail is updated relative to data write/read."
+        }
+      ]
+    },
+    {
+      "milestone_id": "m4",
+      "prompt": "Create separate producer and consumer binaries that use the shared ring buffer.",
+      "milestone_reason_optional": "Tests multi-process correctness.",
+      "continuation_criteria": "Two binaries communicate correctly through shared memory.",
+      "planned_interactions_list": [
+        {
+          "trigger": "Model runs both in same process",
+          "reaction": "Separate processes. This is IPC."
+        }
+      ]
+    },
+    {
+      "milestone_id": "m5",
+      "prompt": "Add benchmarking for throughput and latency across multiple buffer sizes.",
+      "milestone_reason_optional": "Validates performance measurement.",
+      "continuation_criteria": "Benchmark reports throughput/latency for varying capacities.",
+      "planned_interactions_list": [
+        {
+          "trigger": "Model measures only total time",
+          "reaction": "Break it into throughput and per-message latency."
+        }
+      ]
+    },
+    {
+      "milestone_id": "m6",
+      "prompt": "Compare performance with and without cache-line padding to demonstrate false sharing.",
+      "milestone_reason_optional": "Tests deeper systems knowledge.",
+      "continuation_criteria": "Model shows measurable performance difference and explains it.",
+      "planned_interactions_list": [
+        {
+          "trigger": "Model does not modify struct layout",
+          "reaction": "You need two versions: padded vs non-padded."
+        }
+      ]
+    }
+  ],
+  "rubrics": [
+    {
+      "name": "r1_memory_layout_correct",
+      "criterion": "Ring buffer uses separate atomic head and tail indices in shared memory.",
+      "type": "correctness",
+      "importance": "MUST_FOLLOW",
+      "target_milestones": ["m1"]
+    },
+    {
+      "name": "r2_no_locks_used",
+      "criterion": "Solution does not use Mutex, RwLock, or any blocking synchronization primitive.",
+      "type": "correctness",
+      "importance": "MUST_FOLLOW",
+      "target_milestones": ["m1", "m3"]
+    },
+    {
+      "name": "r3_memory_ordering_defined",
+      "criterion": "Atomic operations use explicit Acquire/Release ordering.",
+      "type": "correctness",
+      "importance": "MUST_FOLLOW",
+      "target_milestones": ["m1", "m3"]
+    },
+    {
+      "name": "r4_uses_shm_open",
+      "criterion": "Shared memory is created using shm_open via libc.",
+      "type": "correctness",
+      "importance": "MUST_FOLLOW",
+      "target_milestones": ["m2"]
+    },
+    {
+      "name": "r5_uses_mmap",
+      "criterion": "Memory is mapped using mmap.",
+      "type": "correctness",
+      "importance": "MUST_FOLLOW",
+      "target_milestones": ["m2"]
+    },
+    {
+      "name": "r6_atomic_enqueue_logic",
+      "criterion": "Enqueue operation writes data before advancing head index.",
+      "type": "correctness",
+      "importance": "MUST_FOLLOW",
+      "target_milestones": ["m3"]
+    },
+    {
+      "name": "r7_atomic_dequeue_logic",
+      "criterion": "Dequeue operation reads data before advancing tail index.",
+      "type": "correctness",
+      "importance": "MUST_FOLLOW",
+      "target_milestones": ["m3"]
+    },
+    {
+      "name": "r8_multi_process_execution",
+      "criterion": "Producer and consumer run as separate OS processes.",
+      "type": "correctness",
+      "importance": "MUST_FOLLOW",
+      "target_milestones": ["m4"]
+    },
+    {
+      "name": "r9_benchmark_reports_metrics",
+      "criterion": "Benchmark outputs both throughput and latency.",
+      "type": "correctness",
+      "importance": "MUST_FOLLOW",
+      "target_milestones": ["m5"]
+    },
+    {
+      "name": "r10_false_sharing_experiment",
+      "criterion": "Solution includes both padded and non-padded struct versions for comparison.",
+      "type": "correctness",
+      "importance": "MUST_FOLLOW",
+      "target_milestones": ["m6"]
+    },
+    {
+      "name": "r11_progressive_decomposition",
+      "criterion": "Model breaks problem into design, implementation, and benchmarking stages before coding everything.",
+      "type": "agent_behavior",
+      "importance": "GOOD_TO_HAVE",
+      "target_milestones": ["m1"]
+    },
+    {
+      "name": "r12_handles_feedback",
+      "criterion": "Model adjusts approach correctly after user correction.",
+      "type": "agent_behavior",
+      "importance": "GOOD_TO_HAVE",
+      "target_milestones": ["m2", "m3"]
+    },
+    {
+      "name": "r13_concise_technical_explanations",
+      "criterion": "Responses are concise and technically precise without unnecessary verbosity.",
+      "type": "communication",
+      "importance": "GOOD_TO_HAVE",
+      "target_milestones": ["m1", "m3"]
+    }
+  ]
+}
